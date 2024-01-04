@@ -1,0 +1,103 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+
+#define MAX_LENGTH 1024    // Max length of command
+#define DELIMS " \t\r\n"   // Delimiters for the command parser
+
+void typeLine(const char *arg, const char *filename) {
+    FILE *file = fopen(filename, "r");
+    if (file == NULL) {
+        perror("Error opening file");
+        return;
+    }
+
+    if (arg[0] == '+') {
+        int n = atoi(arg + 1);
+        char *line = NULL;
+        size_t len = 0;
+        for (int i = 0; i < n && getline(&line, &len, file) != -1; i++) {
+            printf("%s", line);
+        }
+        free(line);
+    } else if (arg[0] == '-' && arg[1] == 'a') {
+        char buffer[1024];
+        while (fgets(buffer, 1024, file)) {
+            printf("%s", buffer);
+        }
+    } else {
+        printf("Invalid argument for typeline\n");
+    }
+
+    fclose(file);
+}
+
+void executeCommand(char **args) {
+    pid_t pid, wpid;
+    int status;
+
+    pid = fork();
+    if (pid == 0) {
+        // Child process
+        if (execvp(args[0], args) == -1) {
+            perror("myshell");
+        }
+        exit(EXIT_FAILURE);
+    } else if (pid < 0) {
+        // Error forking
+        perror("myshell");
+    } else {
+        // Parent process
+        do {
+            wpid = waitpid(pid, &status, WUNTRACED);
+        } while (!WIFEXITED(status) && !WIFSIGNALED(status));
+    }
+}
+
+int main() {
+    char line[MAX_LENGTH];  // Command line string
+    char *args[MAX_LENGTH / 2];  // Command arguments
+    int should_run = 1;  // Flag for the loop
+
+    while (should_run) {
+        printf("myshell$ ");
+        fflush(stdout);
+
+        // Read the command from the command line
+        if (!fgets(line, MAX_LENGTH, stdin)) break;
+
+        // Exit on Ctrl+D
+        if (feof(stdin)) {
+            printf("\n");
+            break;
+        }
+
+        // Split the line into arguments
+        int argc = 0;
+        args[0] = strtok(line, DELIMS);
+        while (args[argc] != NULL) {
+            argc++;
+            args[argc] = strtok(NULL, DELIMS);
+        }
+
+        // Check if the command is to exit
+        if (args[0] != NULL && strcmp(args[0], "exit") == 0) {
+            should_run = 0;
+        } else if (args[0] != NULL && strcmp(args[0], "typeline") == 0) {
+            // Custom command
+            if (argc >= 3) {
+                typeLine(args[1], args[2]);
+            } else {
+                fprintf(stderr, "Usage: typeline +n|-a filename\n");
+            }
+        } else if (args[0] != NULL) {
+            // Execute regular command
+            executeCommand(args);
+        }
+    }
+
+    return 0;
+}

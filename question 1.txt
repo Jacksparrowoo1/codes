@@ -1,0 +1,55 @@
+#include <stdio.h>
+#include <stdlib.h>
+
+int findOptimal(int reference[], int page_frames[], int pages, int frames, int index) {
+    int res = -1, farthest = index;
+    for (int i = 0; i < frames; i++) {
+        int j;
+        for (j = index; j < pages; j++) {
+            if (page_frames[i] == reference[j]) {
+                if (j > farthest) {
+                    farthest = j;
+                    res = i;
+                }
+                break;
+            }
+        }
+        if (j == pages) return i;
+    }
+    return (res == -1) ? 0 : res;
+}
+
+void optimalPage(int reference[], int pages, int frames) {
+    int page_faults = 0;
+    int page_frames[frames];
+    for (int i = 0; i < frames; i++)
+        page_frames[i] = -1;
+
+    for (int i = 0; i < pages; i++) {
+        int found = 0;
+        for (int j = 0; j < frames; j++) {
+            if (page_frames[j] == reference[i]) {
+                found = 1;
+                break;
+            }
+        }
+
+        if (!found) {
+            int pos = findOptimal(reference, page_frames, pages, frames, i + 1);
+            page_frames[pos] = reference[i];
+            page_faults++;
+        }
+    }
+
+    printf("Total Page Faults: %d\n", page_faults);
+}
+
+int main() {
+    int reference[] = {3, 4, 5, 4, 3, 4, 7, 2, 4, 5, 6, 7, 2, 4, 6};
+    int pages = sizeof(reference)/sizeof(reference[0]);
+    int frames;
+    printf("Enter the number of frames: ");
+    scanf("%d", &frames);
+    optimalPage(reference, pages, frames);
+    return 0;
+}
